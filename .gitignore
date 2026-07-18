@@ -1,0 +1,11 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# macOS
+.DS_Store
+
+# Stale artifact from earlier iterations (blobs are now in template_blobs.json)
+alias_blobs_template.json

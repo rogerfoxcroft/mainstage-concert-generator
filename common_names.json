@@ -1,0 +1,316 @@
+{
+  "_comment": "Canonical book-cue name → list of variation names to try when searching a SOUND BANK. First match wins. Grow this over time; a match against any variation surfaces the canonical name back to the workflow.",
+
+  "Piano": [
+    "Piano",
+    "Grand Piano",
+    "Concert Grand",
+    "Concert Grand Piano",
+    "Steinway",
+    "Steinway Piano",
+    "Studio Grand Piano",
+    "Studio Grand Piano (One Mic)",
+    "Acoustic Piano",
+    "Bright Acoustic Piano",
+    "PNO",
+    "D4 Default",
+    "PianoTeq D4",
+    "Power Grand",
+    "CP80"
+  ],
+  "Bright Acoustic Piano": [
+    "Bright Acoustic Piano",
+    "Bright Piano",
+    "Squeeze Pop"
+  ],
+  "Electric Piano 1": [
+    "Electric Piano 1",
+    "EP1",
+    "EP 1",
+    "E.P. 1",
+    "Rhodes",
+    "Rhodes 1",
+    "Modern Rhodes",
+    "Deluxe Classic",
+    "Classic EP",
+    "Vintage Rhodes",
+    "Suitcase EP",
+    "Stage Mk II",
+    "Stage Mk II Bright EP"
+  ],
+  "Electric Piano 2": [
+    "Electric Piano 2",
+    "EP2",
+    "EP 2",
+    "Rhodes 2",
+    "Wurlitzer",
+    "Wurlitzer Classic EP",
+    "Bright Suitcase",
+    "Suitcase"
+  ],
+  "E.P. 1": [
+    "E.P. 1",
+    "EP1",
+    "Electric Piano 1"
+  ],
+  "Honky-Tonk Piano": [
+    "Honky-Tonk Piano",
+    "Honky Tonk Piano",
+    "Honky Tonk",
+    "PianoTeq - Honky Tonk",
+    "PianoTeq Honky Tonk"
+  ],
+  "Clavinet": [
+    "Clavinet",
+    "Clav",
+    "Seventies Clav",
+    "Hard Clavinet",
+    "LM Hard Clavinet"
+  ],
+  "Clavi": [
+    "Clavi",
+    "Clavinet",
+    "Clav"
+  ],
+  "Harpsichord": [
+    "Harpsichord"
+  ],
+  "Vibraphone": [
+    "Vibraphone",
+    "Vibes"
+  ],
+  "Vibes": [
+    "Vibes",
+    "Vibraphone"
+  ],
+
+  "Rock Organ": [
+    "Rock Organ",
+    "Rock B3",
+    "Grand B3",
+    "Lighter Shade B3",
+    "Lighter Shade B3 (Leslie)",
+    "Jimmy's Organ",
+    "Hard Rock Organ",
+    "B3"
+  ],
+  "Percussive Organ": [
+    "Percussive Organ",
+    "Perc B3",
+    "Percussive B3"
+  ],
+  "Drawbar Organ": [
+    "Drawbar Organ",
+    "Drawbar B3",
+    "Drawbar Hammond",
+    "Reggae Organ"
+  ],
+  "Church Organ": [
+    "Church Organ",
+    "Cathedral Organ",
+    "Pipe Organ",
+    "Full Organ",
+    "Rich Gospel Organ"
+  ],
+
+  "Harp": [
+    "Harp",
+    "Concert Harp",
+    "DX Harp"
+  ],
+  "Cello": [
+    "Cello",
+    "Celli",
+    "Studio Cellos",
+    "Solo Cello",
+    "Solo Cello (No Rev)"
+  ],
+  "String Ensemble 1": [
+    "String Ensemble 1",
+    "Strings Ens. 1",
+    "Strings Ensemble 1",
+    "Studio Violins 1",
+    "Small Section",
+    "Strings",
+    "Violins",
+    "Violins (No Rev)"
+  ],
+  "String Ensemble 2": [
+    "String Ensemble 2",
+    "Strings Ens 2",
+    "Strings Ensemble 2",
+    "Strings 2",
+    "Fast Strings",
+    "Muted Violins"
+  ],
+  "String Section": [
+    "String Section",
+    "Strings Ens. 1",
+    "Small Section",
+    "Strings",
+    "Marc. Strings",
+    "Staccato Strings"
+  ],
+  "Stac. Strings": [
+    "Stac. Str.",
+    "Staccato Strings",
+    "Stac Strings"
+  ],
+  "Disco Strings": [
+    "Disco Strings"
+  ],
+
+  "French Horn": [
+    "French Horn",
+    "French Horn Solo",
+    "French Horn Solo+",
+    "Horn Solo",
+    "Solo Horn"
+  ],
+  "French Horns": [
+    "French Horns",
+    "French Horns+",
+    "Horns",
+    "French Horns Bright",
+    "French Horns Stopped",
+    "Stopped Horns"
+  ],
+  "Brass Section": [
+    "Brass Section",
+    "Full Brass",
+    "Full Brass+",
+    "Brass",
+    "Marcato Horns",
+    "Trumpets",
+    "Trombones"
+  ],
+  "Synth Brass": [
+    "Synth Brass",
+    "Analog Brass"
+  ],
+  "Synth Brass 1": [
+    "Synth Brass 1",
+    "Synth Brass",
+    "Analog Brass"
+  ],
+
+  "Distortion Guitar": [
+    "Distortion Guitar",
+    "Hard Rock",
+    "Rock Guitar",
+    "Overdrive Guitar",
+    "Vintage Strat",
+    "Strat"
+  ],
+  "Acoustic Guitar": [
+    "Acoustic Guitar",
+    "Steel String",
+    "Acoustic Steel",
+    "Acoustic Steel String",
+    "Nylon Guitar"
+  ],
+  "Acoustic Guitar Steel String": [
+    "Acoustic Guitar Steel String",
+    "Acoustic Guitar",
+    "Steel String"
+  ],
+
+  "Accordion": [
+    "Accordion",
+    "Tango Accordion"
+  ],
+
+  "Kalimba": [
+    "Kalimba",
+    "African Kalimba"
+  ],
+  "Marimba": [
+    "Marimba",
+    "African Marimba"
+  ],
+  "Xylophone": [
+    "Xylophone"
+  ],
+
+  "Synth Strings": [
+    "Synth Strings",
+    "Synth Strings 1"
+  ],
+  "Synth Strings 1": [
+    "Synth Strings 1",
+    "Bright Synth Strings"
+  ],
+  "Synth Strings 2": [
+    "Synth Strings 2"
+  ],
+
+  "Orch Hit": [
+    "Orch Hit",
+    "Orchestra Hit"
+  ],
+
+  "FX 3 - Crystal": [
+    "FX 3 - Crystal",
+    "Crystal"
+  ],
+  "FX 7 - Echoes": [
+    "FX 7 - Echoes",
+    "FX7 - Echoes",
+    "FX 7 Echoes",
+    "Echoes"
+  ],
+
+  "Lead 1 - Square": [
+    "Lead 1 - Square",
+    "Square",
+    "Square Wave",
+    "Square Lead"
+  ],
+  "Lead 4 - Chiff": [
+    "Lead 4 - Chiff",
+    "Chiff",
+    "Chiff Lead",
+    "TG300-A084-Chiff Ld"
+  ],
+  "Lead 5 - Charang": [
+    "Lead 5 - Charang",
+    "Charang",
+    "Charang Lead"
+  ],
+  "Lead 8 - Bass + Lead": [
+    "Lead 8 - Bass + Lead",
+    "Bass & Lead",
+    "Bass and Lead",
+    "Bass+Lead"
+  ],
+
+  "Pad 1 - New Age": [
+    "Pad 1 - New Age",
+    "New Age",
+    "New Age Pad"
+  ],
+  "Pad 3 - Polysynth": [
+    "Pad 3 - Polysynth",
+    "Polysynth",
+    "PolySynth"
+  ],
+  "Pad 5 - Bowed": [
+    "Pad 5 - Bowed",
+    "Bowed",
+    "Bowed Glass",
+    "Bowed Pad"
+  ],
+  "Warm Pad": [
+    "Warm Pad",
+    "Pad"
+  ],
+  "Rain": [
+    "Rain",
+    "Ice Rain"
+  ],
+
+  "80s Pluck Bass": [
+    "80s Pluck Bass",
+    "Pluck Bass"
+  ]
+}
