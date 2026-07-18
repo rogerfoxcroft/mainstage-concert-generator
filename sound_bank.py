@@ -21,6 +21,7 @@ import os
 import json
 import re
 import unicodedata
+import uuid as uuidlib
 
 
 SAMPLE_EXTS = (".wav", ".aif", ".aiff", ".caf")
@@ -313,6 +314,81 @@ def report(catalog, cues, aliases):
     lines.append(f"  curated matches:            {n_curated_match} / {len(cues)}")
     lines.append(f"  fell back to SoundFont:     {matched - n_curated_match} / {len(cues)}")
     return "\n".join(lines)
+
+
+# ----- .cst synthesis -------------------------------------------------------
+#
+# A Sampler-based .cst file contains the loaded EXS filename in two
+# null-padded fields — one in a config chunk near the top and one inside a
+# `MELCPMAS1MAS` chunk — plus a single UUID field embedded in an
+# NSKeyedArchive blob preceded by the marker `UUIDBytes\x80\x04\x4f\x10\x10`.
+#
+# Both substitutions preserve total file size (fields are null-padded to a
+# fixed length, and the UUID field is exactly 16 bytes).
+
+_UUID_MARKER = b"UUIDBytes\x80\x04\x4f\x10\x10"
+
+
+def _substitute_exs_in_cst(cst_bytes, old_exs_stem, new_exs_stem):
+    """Replace every occurrence of `<old_stem>.exs` with `<new_stem>.exs`,
+    keeping each null-padded field's length constant."""
+    old = (old_exs_stem + ".exs").encode("utf-8")
+    new = (new_exs_stem + ".exs").encode("utf-8")
+    out = bytearray(cst_bytes)
+    pos = 0
+    while True:
+        i = out.find(old + b"\x00", pos)
+        if i < 0:
+            break
+        end = i + len(old)
+        while end < len(out) and out[end] == 0:
+            end += 1
+        field_size = end - i
+        if len(new) + 1 > field_size:
+            raise ValueError(
+                f"New EXS name '{new_exs_stem}.exs' ({len(new)+1} bytes) does "
+                f"not fit in .cst field at 0x{i:x} ({field_size} bytes)"
+            )
+        for j in range(i, end):
+            out[j] = 0
+        out[i : i + len(new)] = new
+        pos = i + len(new) + 1
+    return bytes(out)
+
+
+def _substitute_uuid_in_cst(cst_bytes, new_uuid_str):
+    """Replace the single embedded UUID (found via `UUIDBytes` marker) with
+    the 16 bytes of `new_uuid_str`."""
+    out = bytearray(cst_bytes)
+    i = out.find(_UUID_MARKER)
+    if i < 0:
+        raise ValueError("UUID marker not found in .cst template")
+    offset = i + len(_UUID_MARKER)
+    out[offset : offset + 16] = uuidlib.UUID(new_uuid_str).bytes
+    return bytes(out)
+
+
+def synthesize_cst(template_bytes, template_original_exs_stem,
+                   target_exs_stem, target_uuid_str):
+    """Turn a Sampler-based .cst template into a new .cst that loads
+    `<target_exs_stem>.exs` with the identity `target_uuid_str`.
+
+    - `template_bytes` — bytes of a known-good Sampler-based .cst
+      (currently: Roger's Harp.cst).
+    - `template_original_exs_stem` — the .exs stem the template
+      currently references (e.g. "Harp"). Both null-padded field slots
+      containing this name get overwritten.
+    - `target_exs_stem` — the .exs stem to load (must exist in a folder
+      Sampler will search — the user's SOUND BANK roots).
+    - `target_uuid_str` — the UUID to embed. Must match whatever the
+      generator uses in the outer data.plist channel dict for aliasing
+      to work.
+
+    File size is preserved."""
+    out = _substitute_exs_in_cst(template_bytes, template_original_exs_stem,
+                                 target_exs_stem)
+    out = _substitute_uuid_in_cst(out, target_uuid_str)
+    return out
 
 
 # ----- CLI ------------------------------------------------------------------

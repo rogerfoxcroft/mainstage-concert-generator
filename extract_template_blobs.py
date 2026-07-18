@@ -57,6 +57,13 @@ def main():
         # Orch Rev's binary is what we want as Reverb — filename change is
         # handled in the plist below and by where we write it in the generator
         ("root_cst_reverb", f"{REF}/Concert.patch/Orch Rev.cst"),
+        # Sampler-based .cst template. Contains a Sampler plugin instance
+        # with 'Harp.exs' referenced in two null-padded chunks and a single
+        # 16-byte embedded UUID; `synthesize_cst` in sound_bank.py
+        # substitutes both to produce .cst files for arbitrary EXS
+        # instruments.
+        ("sampler_template_cst",
+         f"{REF}/Concert.patch/SOUNDS.patch/Strings.patch/Harp.cst"),
         ("set_patch_data_plist",
          f"{REF}/Concert.patch/1. On any Given Sunday.patch/data.plist"),
         ("leaf_patch_data_plist",
