@@ -97,6 +97,19 @@ def main():
         blobs[key] = base64.b64encode(ch[blob_key]).decode("ascii")
         print(f"  {key:<30} {len(blobs[key]):>8} b64 chars")
 
+    # SOUNDS-bank channel-dict template — the Harp entry from Roger's Strings
+    # category. Used as the base for synthesized Auto/<sound> entries so we
+    # inherit the color blob, standard routing defaults, and everything else
+    # a proper SOUNDS-bank channel needs. Serialized as its own binary plist
+    # so nested bytes (like the color bplist) survive the trip through JSON.
+    strings_pl = plistlib.load(open(
+        f"{REF}/Concert.patch/SOUNDS.patch/Strings.patch/data.plist", "rb"
+    ))
+    harp_ch = next(c for c in strings_pl["channels"] if c["Filename"] == "Harp.cst")
+    ch_plist_bytes = plistlib.dumps(harp_ch, fmt=plistlib.FMT_BINARY)
+    blobs["sampler_source_channel_plist"] = base64.b64encode(ch_plist_bytes).decode("ascii")
+    print(f"  sampler_source_channel_plist   {len(blobs['sampler_source_channel_plist']):>8} b64 chars")
+
     os.makedirs(os.path.dirname(OUT), exist_ok=True)
     with open(OUT, "w") as f:
         json.dump(blobs, f)
