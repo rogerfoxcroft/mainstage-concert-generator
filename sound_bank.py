@@ -92,12 +92,18 @@ def _split_compound(s):
 
 
 def _norm(s):
-    """Lowercase, split compounds, strip punctuation except digits/spaces,
-    collapse whitespace."""
+    """Lowercase, split compounds, strip musical transposition tags,
+    strip punctuation except digits/spaces, collapse whitespace.
+
+    Transposition tags (8va, 8vb, 15ma, loco) get stripped because
+    they're performance directions ('play these notes but sound them
+    an octave higher/lower'), not different sounds. 'Strings 8vb' and
+    'Strings' should both match the same catalog entry."""
     s = unicodedata.normalize("NFKD", s)
     s = "".join(c for c in s if not unicodedata.combining(c))
     s = _split_compound(s)
     s = re.sub(r"[^a-z0-9\s]", " ", s.lower())
+    s = re.sub(r"\b(?:8va|8vb|15ma|15mb|loco)\b", " ", s)
     s = re.sub(r"\s+", " ", s).strip()
     return s
 
