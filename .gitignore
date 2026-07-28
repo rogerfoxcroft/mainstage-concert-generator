@@ -9,3 +9,10 @@ __pycache__/
 
 # Stale artifact from earlier iterations (blobs are now in template_blobs.json)
 alias_blobs_template.json
+
+# Per-show working artifacts — extracted cues + hand-tuned mapping live
+# alongside each show's PDF, not in the tool repo. The legacy plain-named
+# cues.json / mapping.json are the Footloose K2 reference example the
+# README documents and remain tracked.
+*.cues.json
+*.mapping.json
