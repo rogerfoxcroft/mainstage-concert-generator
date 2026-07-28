@@ -10,76 +10,86 @@ unusual patches.
 
 ### Code
 
-- **`generate_concert.py`** — the generator. Reads a cue list, a
-  cue-to-SOUNDS mapping, and template blobs, and writes a valid
-  MainStage `.concert` bundle. Reference-independent: no runtime
-  dependency on any specific concert bundle beyond the user's SOUNDS
-  bank.
+- **`generate_concert.py`** — the generator. Reads a per-show cue list
+  and optional mapping, resolves each sound against a user SOUND BANK,
+  synthesizes any missing channel-strip `.cst` files, and writes a
+  valid MainStage `.concert` bundle. Supports layered patches and
+  two-zone keyboard splits at C3.
+- **`sound_bank.py`** — scanner + matcher for user SOUND BANK folders
+  (a tree of `Sampler Instruments/*.exs` + peer `Samples/`). Catalogs
+  available EXS instruments and matches book-cue names via fuzzy
+  substring + variant + alias lookup, preferring curated instruments
+  over SoundFont-backup fallbacks. Also synthesizes new `.cst` files
+  from a Sampler template by substituting EXS name and UUID.
 - **`extract_template_blobs.py`** — one-time helper that pulls the
   opaque structural bits (root channel-strip `.cst` binaries, plist
-  skeletons, workspace layout, alias-metadata bplists) out of a
-  known-good reference concert and freezes them as `template_blobs.json`.
-  Rerun when the template needs refreshing.
-- **`sound_bank.py`** — scanner for user-supplied SOUND BANK folders
-  (a folder tree of `Sampler Instruments/*.exs` + peer `Samples/`).
-  Catalogs available EXS instruments and matches book-cue names against
-  them via fuzzy substring + variant + alias lookup, preferring curated
-  instruments over SoundFont-backup fallbacks.
+  skeletons, workspace layout, alias-metadata bplists, Sampler `.cst`
+  template) out of a known-good reference concert and freezes them
+  as `template_blobs.json`. Rerun when the template needs refreshing.
 
 ### Data
 
-- **`template_blobs.json`** — 13 base64-encoded blobs the generator
-  needs: 4 root `.cst` binaries (Master, Metronome, Output 1-2, Reverb),
-  the top-level `data.plist`, `base.plistZ`, `workspace.layout`,
-  concert/set/leaf `data.plist` skeletons, and the three alias-metadata
-  NSKeyedArchive bplists (`mappings`, `layer`, `metaInfo`). ~527 KB.
-- **`common_names.json`** — persistent name-alias file mapping canonical
-  book-cue names to a list of variations the scanner should treat as
-  equivalent. Grow this over time as new shows surface new naming
-  patterns.
-
-### Example per-show input (Footloose Keyboard 2)
-
-- **`cues.json`** — extracted patch cues per song, keyed by bar number,
-  produced by the vision-based PDF extractor.
-- **`mapping.json`** — cue-text → `(SOUNDS category, .cst filename)`.
-  Currently references the Footloose K2 SOUNDS bank; each show gets its
-  own mapping, potentially auto-generated in future.
+- **`template_blobs.json`** — 15 base64-encoded blobs the generator
+  needs: root channel-strip `.cst` binaries (Master, Metronome,
+  Output 1-2, Reverb), the top-level `data.plist`, `base.plistZ`,
+  `workspace.layout`, concert/set/leaf `data.plist` skeletons, the
+  three alias-metadata NSKeyedArchive bplists (`mappings`, `layer`,
+  `metaInfo`), and a Sampler-based `.cst` template + its source
+  channel dict used to synthesize any EXS-backed source at run-time.
+- **`common_names.json`** — persistent name-alias file. Maps each
+  canonical book-cue name to (a) a list of variation names the SOUND
+  BANK scanner should treat as equivalent, and (b) an instrument
+  family (`_families` section) used for colour-coding and bucketing
+  channels into `SOUNDS.patch/<Family>.patch/`. Grow this as new
+  shows surface new naming patterns.
 
 ## Usage
 
-Point the generator at a folder that contains a SOUNDS bank concert and
-run:
+The generator is show-parameterized. Set `SHOW` to the human-readable
+show name; the tool reads `<SHOW>.cues.json` (and optionally
+`<SHOW>.mapping.json`) from `$CONCERT_BUILDER_BASE/_generator/` and
+writes `<SHOW> GENERATED.concert` alongside the source PDF.
 
 ```
 CONCERT_BUILDER_BASE=/path/to/workdir \
+  SHOW="Footloose K2" \
   SOUND_BANK_ROOTS="$HOME/Music/Audio Music Apps" \
-  python3 generate_concert.py
+  python3 _generator/generate_concert.py
 ```
 
-The generator expects to find, under `$CONCERT_BUILDER_BASE/_generator/`,
-`template_blobs.json`, `cues.json`, `mapping.json`, and (optionally)
-`common_names.json`. It writes the resulting `.concert` bundle at
-`$CONCERT_BUILDER_BASE/Footloose K2 GENERATED.concert` (currently
-hardcoded — will parameterise).
+Per-show input files (`<show>.cues.json`, `<show>.mapping.json`) live
+alongside each show's PDF in the workdir — they are not tracked here
+(see `.gitignore`).
 
 `SOUND_BANK_ROOTS` is a colon-separated list of folders each containing
 `Sampler Instruments/` and `Samples/`. The scanner reports which cues
 have a curated match, which fall back to a SoundFont-backup instrument,
 and which don't match at all.
 
+Cue resolution order per sound: curated EXS match > mapping.json
+override > SoundFont-backup EXS > placeholder (empty leaf).
+
+## Layers and splits
+
+Cues.json v2 supports layered and split patches:
+
+```json
+{"bar": 4,  "channel_name": "Slow Strings + Voices",
+            "layers": ["Slow Strings", "Voices"],
+            "zone": null, "split_note": null}
+
+{"bar": 38, "channel_name": "Warm Pad + Synth Strings",
+            "layers": ["Warm Pad", "Synth Strings"],
+            "zone": "RH", "split_note": 60}
+```
+
+A layered patch becomes one aliased channel per sound, all across the
+full keyboard. A zoned cue (`"RH"` or `"LH"`) constrains its channels
+to notes above/below the split point (currently forced to C3 = MIDI
+60, non-overlapping). Zones carry across bars — an RH cue at m38
+followed by an LH cue at m41 emits an m41 patch with both zones active.
+
 ## Design docs
 
 The reverse-engineered `.concert` format, Roger's conventions, and the
 PDF annotation model are captured in a Claude project (not this repo).
-
-## Known follow-ups
-
-- Currently the generator still copies channel strips from a reference
-  SOUNDS.patch bundle. The next architectural step is synthesising
-  channel-strip `.cst` files from matched EXS files, breaking the last
-  dependency on a curated `.cst` library.
-- `mapping.json` should be derivable from `common_names.json` + a SOUND
-  BANK scan — currently hand-authored per show.
-- Per-sound alias-metadata blobs (each alias currently reuses Hard Rock
-  m8's `mappings` / `layer` / `metaInfo`).
