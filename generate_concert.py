@@ -103,15 +103,15 @@ SAMPLER_TEMPLATE_EXS_STEM = "Harp"
 # Roger asked for "a different colour for each family" — the exact hues
 # don't matter, they just have to be distinct.
 FAMILY_COLORS = {
-    "Keyboards":  (0.87, 0.24, 0.29),  # red
-    "Strings":    (0.20, 0.44, 0.80),  # blue
-    "Brass":      (0.95, 0.60, 0.20),  # orange
-    "Woodwinds":  (0.30, 0.68, 0.35),  # green
-    "Guitars":    (0.90, 0.72, 0.20),  # yellow-gold
-    "Synths":     (0.60, 0.30, 0.80),  # purple
-    "Percussion": (0.20, 0.65, 0.65),  # teal
-    "Voices":     (0.95, 0.55, 0.75),  # pink
-    "Other":      (0.50, 0.50, 0.50),  # neutral grey
+    "Keyboards":  (0.55, 0.12, 0.16),  # burgundy
+    "Strings":    (0.12, 0.26, 0.55),  # navy
+    "Brass":      (0.65, 0.38, 0.10),  # rust
+    "Woodwinds":  (0.15, 0.42, 0.20),  # forest green
+    "Guitars":    (0.55, 0.42, 0.08),  # dark mustard
+    "Synths":     (0.34, 0.14, 0.55),  # indigo
+    "Percussion": (0.10, 0.42, 0.42),  # dark teal
+    "Voices":     (0.58, 0.24, 0.42),  # mauve
+    "Other":      (0.30, 0.30, 0.30),  # dark grey
 }
 FAMILY_SEQ_INDEX = {
     "Keyboards":  3,
@@ -278,33 +278,66 @@ def load_sounds_inventory():
     return inventory
 
 
-def build_zoned_layer_bplist(orig_layer_bytes, low_note, high_note):
-    """Rewrite an alias's `layer` NSKeyedArchive so the alias is
-    constrained to a [low_note, high_note] MIDI range with
-    overrideParentsKeyZone=True.
+def build_layer_bplist(orig_layer_bytes, low_note=None, high_note=None,
+                       transpose=0):
+    """Rewrite an alias's `layer` NSKeyedArchive with an optional zone
+    (lowNote/highNote/overrideParentsKeyZone) and an optional MIDI
+    transpose in semitones.
 
-    None on both args (or a full-range 0..127 pair) returns the archive
-    unchanged, so full-keyboard aliases keep the exact byte-identical
-    layer blob shipped in template_blobs.json.
+    Passing all-default values returns the archive unchanged, so full-
+    keyboard non-transposed aliases keep the exact byte-identical layer
+    blob shipped in template_blobs.json.
+
+    - `low_note` / `high_note`: MIDI note numbers bounding the zone.
+      None (both) or a full-range 0..127 pair means 'don't touch zone'.
+    - `transpose`: octave/interval shift in semitones. +12 = 8va,
+      -12 = 8vb, +24 = 15ma, -24 = 15mb, etc. 0 = loco.
     """
-    if (low_note is None and high_note is None) or \
-       (low_note == 0 and high_note == 127):
+    zone_untouched = (low_note is None and high_note is None) or \
+                     (low_note == 0 and high_note == 127)
+    if zone_untouched and transpose == 0:
         return orig_layer_bytes
     layer_pl = plistlib.loads(orig_layer_bytes)
     root = layer_pl["$objects"][1]
-    root["lowNote"] = 0 if low_note is None else low_note
-    root["highNote"] = 127 if high_note is None else high_note
-    root["overrideParentsKeyZone"] = True
+    if not zone_untouched:
+        root["lowNote"] = 0 if low_note is None else low_note
+        root["highNote"] = 127 if high_note is None else high_note
+        root["overrideParentsKeyZone"] = True
+    if transpose != 0:
+        root["transpose"] = transpose
     return plistlib.dumps(layer_pl, fmt=plistlib.FMT_BINARY)
 
 
+# Back-compat: the old name still works for zone-only callers.
+def build_zoned_layer_bplist(orig_layer_bytes, low_note, high_note):
+    return build_layer_bplist(orig_layer_bytes, low_note, high_note, 0)
+
+
+# Octave notation → semitone map. 8va/8ma = +12 (one octave up),
+# 8vb/8mb = -12, 15ma/15va = +24, 15mb/15vb = -24, and so on.
+# The "8, 15, 22, 29..." sequence is diatonic (8ve = one octave); the
+# semitone equivalent is 12, 24, 36, 48 respectively.
+OCTAVE_NOTATION_SEMITONES = {
+    "loco": 0,
+    "8va": 12, "8ma": 12,
+    "8vb": -12, "8mb": -12,
+    "15ma": 24, "15va": 24,
+    "15mb": -24, "15vb": -24,
+    "22ma": 36, "22va": 36,
+    "22mb": -36, "22vb": -36,
+    "29ma": 48, "29va": 48,
+    "29mb": -48, "29vb": -48,
+}
+
+
 def apply_conventions_to_channel(src_ch, display_name, output_index,
-                                 alias_blobs, zone_bplist=None):
+                                 alias_blobs, layer_bplist=None):
     """Turn a SOUNDS-bank channel dict into a song-patch alias.
 
-    `zone_bplist`, when given (already-zoned via build_zoned_layer_bplist),
-    replaces the default alias layer archive so this alias only responds
-    to notes in its zone. Pass None for a full-keyboard alias.
+    `layer_bplist`, when given (already-customised via build_layer_bplist),
+    replaces the default alias layer archive so this alias picks up the
+    zone constraints and/or transpose baked into that layer. Pass None
+    for a plain full-keyboard, non-transposed alias.
     """
     new_ch = copy.deepcopy(src_ch)
     new_ch["Channel_name"] = display_name
@@ -316,7 +349,7 @@ def apply_conventions_to_channel(src_ch, display_name, output_index,
     new_ch["isAlias"] = True
     new_ch["aliasUUID"] = new_ch["UUID"]
     new_ch["mappings"] = alias_blobs["mappings"]
-    new_ch["layer"] = zone_bplist if zone_bplist is not None else alias_blobs["layer"]
+    new_ch["layer"] = layer_bplist if layer_bplist is not None else alias_blobs["layer"]
     new_ch["metaInfo"] = alias_blobs["metaInfo"]
     # Manual preset display
     new_ch["Channel_chaStrName"] = None
@@ -335,12 +368,35 @@ ZONE_RANGES = {
 }
 
 
+def normalize_layers(cue):
+    """Return the cue's layers as a list of {sound, transpose} dicts.
+    Accepts three schema shapes:
+      - v1 (Footloose): no `layers` field — treat channel_name as a
+        single-sound layer with transpose=0.
+      - v2 (SNW): `layers` is a list of sound-name strings — each with
+        transpose=0.
+      - v3 (Shrek): `layers` is a list of dicts {sound, transpose?}.
+    Missing transpose defaults to 0.
+    """
+    raw = cue.get("layers")
+    if not raw:
+        return [{"sound": cue["channel_name"], "transpose": 0}]
+    out = []
+    for item in raw:
+        if isinstance(item, str):
+            out.append({"sound": item, "transpose": 0})
+        else:
+            out.append({
+                "sound": item["sound"],
+                "transpose": int(item.get("transpose", 0)),
+            })
+    return out
+
+
 def cue_sounds(cue):
-    """Return the list of sound names a cue introduces on its zone.
-    Layers is authoritative when present; otherwise fall back to
-    treating channel_name as a single-layer sound (backward-compat
-    with cues.json v1 like Footloose K2's)."""
-    return list(cue.get("layers") or [cue["channel_name"]])
+    """Just the sound names, for downstream code that only needs the
+    list of instruments a cue introduces."""
+    return [layer["sound"] for layer in normalize_layers(cue)]
 
 
 def collect_sound_names(songs):
@@ -362,11 +418,12 @@ def build_auto_source_channel(sampler_channel_template, exs_stem, new_uuid,
 
     IMPORTANT: on a SOURCE channel (as opposed to a song-patch alias),
     MainStage calls -UTF8String on Channel_chaStrName/FullPath during
-    document load — if these are NSNull it crashes hard. So we leave the
-    Harp-template's channel-strip name/path/category untouched here.
-    They're arbitrary display strings on the source; the alias copies in
-    song patches will still show as 'Manual' because apply_conventions_
-    to_channel nulls them out on the alias (which IS tolerated)."""
+    document load — if these are NSNull it crashes hard. Empty strings
+    are fine, so we replace Harp's chaStrName/FullPath/Category with
+    innocuous defaults instead of leaking 'Harp' onto every synthesized
+    source. The alias copies in song patches keep displaying 'Manual'
+    because apply_conventions_to_channel nulls their layer archive
+    fields — that's the alias-only rule, tolerated by MainStage."""
     ch = copy.deepcopy(sampler_channel_template)
     ch["Filename"] = f"{exs_stem}.cst"
     ch["Channel_name"] = exs_stem
@@ -375,6 +432,9 @@ def build_auto_source_channel(sampler_channel_template, exs_stem, new_uuid,
     ch["Custom_name"] = True
     ch["Custom_icon"] = GENERIC_ICON
     ch["Track_icon"] = GENERIC_ICON
+    ch["Channel_chaStrName"] = "Default"
+    ch["Channel_chaStrFullPath"] = ""
+    ch["Channel_chaStrCategory"] = ""
     return ch
 
 
@@ -412,27 +472,41 @@ def make_set_patch_dict(set_name, child_names, template_bytes):
     return d
 
 
-def resolve_sounds(songs, mapping, inventory, catalog, aliases, sound_bank_mod):
+def _is_gliss_sound(name):
+    """A sound name that should route through the harp-gliss template
+    (Harp EXS + Scripter). Currently: any name containing 'gliss'
+    (case-insensitive) — e.g. 'Harp Gliss', 'Harp Glisses'."""
+    return "gliss" in name.lower()
+
+
+def resolve_sounds(songs, mapping, inventory, catalog, aliases, sound_bank_mod,
+                   has_gliss_template=False):
     """Return {sound_name: source_spec}, where source_spec is one of:
-      {"tier": "map", "cat": ..., "fn": ...}
-      {"tier": "exs", "exs_stem": ...}
-      {"tier": "placeholder"}
+      {"tier": "gliss"}                           — Harp Gliss template
+      {"tier": "map", "cat": ..., "fn": ...}      — legacy SOUNDS bank
+      {"tier": "exs", "exs_stem": ...}            — synthesized from EXS
+      {"tier": "placeholder"}                     — nothing matched
 
     Keyed by SOUND (individual layer) name — not by cue-channel name —
     so a layered cue like "Warm Pad + Synth Strings" contributes two
     separate lookups. Each layer becomes its own aliased channel.
 
     Priority (best first):
-      1. Curated EXS match  — SOUND BANK gives a real, not-SoundFont hit.
-      2. Explicit mapping.json entry that resolves in the legacy SOUNDS bank.
-      3. SoundFont-backup EXS match — better than nothing.
-      4. Placeholder.
+      1. Gliss — any sound whose name contains 'gliss'. Wins outright,
+         so 'Harp Gliss' doesn't accidentally resolve to a plain Harp.
+      2. Curated EXS match — SOUND BANK gives a real, not-SoundFont hit.
+      3. Explicit mapping.json entry that resolves in the legacy SOUNDS bank.
+      4. SoundFont-backup EXS match — better than nothing.
+      5. Placeholder.
     """
     all_sounds = collect_sound_names(songs)
     name_index = (sound_bank_mod.build_name_index(catalog)
                   if catalog and sound_bank_mod else None)
     resolved = {}
     for sound in all_sounds:
+        if has_gliss_template and _is_gliss_sound(sound):
+            resolved[sound] = {"tier": "gliss"}
+            continue
         exs_hit = (sound_bank_mod.match_cue(sound, name_index, aliases or {}, catalog)
                    if name_index is not None else None)
         curated_exs = exs_hit if exs_hit and not sound_bank_mod._is_sf_backup(exs_hit) else None
@@ -453,21 +527,28 @@ def resolve_sounds(songs, mapping, inventory, catalog, aliases, sound_bank_mod):
     return resolved
 
 
-def build_alias_channel(sound_name, zone, sound_source, family, inventory,
-                        exs_needed, sampler_channel_template, alias_blobs,
-                        m_folder, sounds_bank_concert):
+def build_alias_channel(sound_name, zone, transpose, sound_source, family,
+                        inventory, exs_needed, sampler_channel_template,
+                        alias_blobs, m_folder, sounds_bank_concert,
+                        gliss_ctx=None):
     """Emit a fully-configured alias channel dict for one sound in one
-    zone within a leaf patch. Also copies the source .cst into the leaf
-    folder (map-tier) or writes the synthesized .cst there (exs-tier).
+    zone with an optional transpose (semitones) within a leaf patch.
+    Also copies the source .cst into the leaf folder (map-tier) or
+    writes the synthesized .cst there (exs-tier / gliss-tier).
 
     Family colour is applied to the returned alias, so families read
     consistently across every patch that uses them.
 
+    `gliss_ctx`, when given, is {"cst": bytes, "src_ch": channel_dict,
+    "filename": "Harp Gliss.cst"} — the template resources needed to
+    alias into the Harp Gliss source channel strip.
+
     Returns (channel_dict, source_kind) where source_kind is 'map',
-    'exs', or 'placeholder'. Placeholder returns (None, 'placeholder').
+    'exs', 'gliss' or 'placeholder'.
     """
     zone_low, zone_high = ZONE_RANGES[zone]
-    zone_bplist = build_zoned_layer_bplist(alias_blobs["layer"], zone_low, zone_high)
+    layer_bplist = build_layer_bplist(
+        alias_blobs["layer"], zone_low, zone_high, transpose)
 
     if sound_source["tier"] == "map":
         cat, fn = sound_source["cat"], sound_source["fn"]
@@ -478,7 +559,7 @@ def build_alias_channel(sound_name, zone, sound_source, family, inventory,
             shutil.copy(src_cst, dst)
         alias = apply_conventions_to_channel(
             src_ch, display_name=sound_name, output_index=0,
-            alias_blobs=alias_blobs, zone_bplist=zone_bplist,
+            alias_blobs=alias_blobs, layer_bplist=layer_bplist,
         )
         return apply_family_color(alias, family), "map"
 
@@ -494,22 +575,35 @@ def build_alias_channel(sound_name, zone, sound_source, family, inventory,
         )
         alias = apply_conventions_to_channel(
             src_ch, display_name=sound_name, output_index=0,
-            alias_blobs=alias_blobs, zone_bplist=zone_bplist,
+            alias_blobs=alias_blobs, layer_bplist=layer_bplist,
         )
         return apply_family_color(alias, family), "exs"
+
+    if sound_source["tier"] == "gliss" and gliss_ctx is not None:
+        filename = gliss_ctx["filename"]
+        dst = f"{m_folder}/{filename}"
+        if not os.path.exists(dst):
+            write_bytes(dst, gliss_ctx["cst"])
+        alias = apply_conventions_to_channel(
+            gliss_ctx["src_ch"], display_name=sound_name, output_index=0,
+            alias_blobs=alias_blobs, layer_bplist=layer_bplist,
+        )
+        return apply_family_color(alias, family), "gliss"
 
     return None, "placeholder"
 
 
 def walk_song_state(cues):
     """Iterator: yields (bar, state_channels) for each bar with any cue
-    change, where state_channels is a list of (sound_name, zone) tuples
-    representing the leaf patch's channels at that bar.
+    change. state_channels is a list of (sound_name, zone, transpose)
+    tuples representing the leaf patch's channels at that bar.
 
     State model:
-      full : list[str] | None   # sounds active across the whole keyboard
-      rh   : list[str] | None   # sounds active above the split (zoned RH)
-      lh   : list[str] | None   # sounds active below the split (zoned LH)
+      full : list[layer] | None   # layers active across the whole keyboard
+      rh   : list[layer] | None   # layers active above the split (RH zone)
+      lh   : list[layer] | None   # layers active below the split (LH zone)
+    where each `layer` is a {sound, transpose} dict.
+
     Full and (rh|lh) are mutually exclusive — a full cue clears rh/lh,
     and a zoned cue clears full. Zones carry across bars until replaced.
     """
@@ -530,7 +624,7 @@ def walk_song_state(cues):
     for bar in sorted(by_bar, key=_bar_sort_key):
         for cue in by_bar[bar]:
             zone = cue.get("zone")
-            layers = cue_sounds(cue)
+            layers = normalize_layers(cue)
             if zone is None:
                 state_full = list(layers)
                 state_rh = None
@@ -545,15 +639,15 @@ def walk_song_state(cues):
 
         channels = []
         if state_full is not None:
-            for s in state_full:
-                channels.append((s, None))
+            for L in state_full:
+                channels.append((L["sound"], None, L["transpose"]))
         else:
             if state_rh is not None:
-                for s in state_rh:
-                    channels.append((s, "RH"))
+                for L in state_rh:
+                    channels.append((L["sound"], "RH", L["transpose"]))
             if state_lh is not None:
-                for s in state_lh:
-                    channels.append((s, "LH"))
+                for L in state_lh:
+                    channels.append((L["sound"], "LH", L["transpose"]))
         yield bar, channels
 
 
@@ -613,13 +707,37 @@ def main():
     except Exception as e:
         print(f"[SOUND BANK scan skipped: {e}]\n")
 
-    # Resolve each SOUND (individual layer) to a source (map/exs/placeholder)
-    sound_sources = resolve_sounds(songs, mapping, inventory, catalog, aliases,
-                                   sound_bank_mod)
-    tier_counts = {"map": 0, "exs": 0, "placeholder": 0}
+    # Prepare the Harp Gliss template context (if bundled) — one shared
+    # source channel per generated concert. Aliases across song patches
+    # all reference it.
+    gliss_ctx = None
+    if "harp_gliss_template_cst" in blobs and "harp_gliss_source_channel_plist" in blobs:
+        gliss_src = plistlib.loads(blobs["harp_gliss_source_channel_plist"])
+        gliss_src["Filename"] = "Harp Gliss.cst"
+        gliss_src["Channel_name"] = "Harp Gliss"
+        gliss_src["Custom_name"] = True
+        gliss_src["Custom_icon"] = GENERIC_ICON
+        gliss_src["Track_icon"] = GENERIC_ICON
+        gliss_src["Channel_chaStrName"] = "Default"
+        gliss_src["Channel_chaStrFullPath"] = ""
+        gliss_src["Channel_chaStrCategory"] = ""
+        gliss_ctx = {
+            "cst": blobs["harp_gliss_template_cst"],
+            "src_ch": gliss_src,
+            "filename": "Harp Gliss.cst",
+        }
+
+    # Resolve each SOUND (individual layer) to a source
+    # (gliss/map/exs/placeholder)
+    sound_sources = resolve_sounds(
+        songs, mapping, inventory, catalog, aliases, sound_bank_mod,
+        has_gliss_template=gliss_ctx is not None,
+    )
+    tier_counts = {"gliss": 0, "map": 0, "exs": 0, "placeholder": 0}
     for s in sound_sources.values():
         tier_counts[s["tier"]] += 1
     print(f"Sound resolution: "
+          f"gliss={tier_counts['gliss']}, "
           f"map={tier_counts['map']}, "
           f"exs={tier_counts['exs']}, "
           f"placeholder={tier_counts['placeholder']}")
@@ -719,12 +837,12 @@ def main():
             m_folder = f"{song_folder}/m{bar}.patch"
             os.makedirs(m_folder, exist_ok=True)
 
-            zones_here = {z for _, z in channels_spec if z is not None}
+            zones_here = {z for _, z, _ in channels_spec if z is not None}
             is_split = len(zones_here) >= 2
             is_layered = len(channels_spec) >= 2 and not is_split
 
             channels = []
-            for sound_name, zone in channels_spec:
+            for sound_name, zone, transpose in channels_spec:
                 src = sound_sources.get(sound_name, {"tier": "placeholder"})
                 # Map-tier sound gets its family from the mapping category
                 # (Roger's mapping.json already uses family names for cat).
@@ -736,6 +854,7 @@ def main():
                 ch, kind = build_alias_channel(
                     sound_name=sound_name,
                     zone=zone,
+                    transpose=transpose,
                     sound_source=src,
                     family=family,
                     inventory=inventory,
@@ -744,6 +863,7 @@ def main():
                     alias_blobs=alias_blobs,
                     m_folder=m_folder,
                     sounds_bank_concert=SOUNDS_BANK_CONCERT,
+                    gliss_ctx=gliss_ctx,
                 )
                 if ch is None:
                     placeholders.append((num, bar, sound_name))
@@ -810,6 +930,18 @@ def main():
         apply_family_color(src_ch, family)
         family_sources.setdefault(family, []).append(
             (src_ch, entry["cst"], f"{stem}.cst", False))
+
+    # Gliss-tier source: one shared Harp Gliss channel strip lives in the
+    # Strings family folder. Only emitted if any cue actually resolved to
+    # the gliss tier — no wasted channel strip otherwise.
+    any_gliss = gliss_ctx is not None and any(
+        s["tier"] == "gliss" for s in sound_sources.values()
+    )
+    if any_gliss:
+        gliss_src_ch = copy.deepcopy(gliss_ctx["src_ch"])
+        apply_family_color(gliss_src_ch, "Strings")
+        family_sources.setdefault("Strings", []).append(
+            (gliss_src_ch, gliss_ctx["cst"], gliss_ctx["filename"], False))
 
     # Emit one <Family>.patch per family that has sources, in the fixed
     # canonical order.

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
-Extract every opaque bit the generator needs from Footloose K2 (and Alias
-Example for cross-reference) into a single template_blobs.json. Runs once.
+Extract every opaque bit the generator needs from Footloose K2 (plus a
+Harp Gliss template concert) into a single template_blobs.json. Runs once.
 
 After this, the generator has no runtime dependency on any reference
 concert bundle — it only needs template_blobs.json + the user's SOUNDS
@@ -23,6 +23,20 @@ Blobs extracted:
 - alias_mappings, alias_layer,
   alias_meta_info                — the three NSKeyedArchive bplists that
                                     every song-patch alias needs
+- sampler_template_cst           — a Sampler-based .cst template (Harp)
+                                    with UUID + EXS filename substitution
+                                    points for synthesising new SOUNDS
+- sampler_source_channel_plist   — the source channel dict for the sampler
+                                    template
+- harp_gliss_template_cst        — a Harp channel strip with the Scripter
+                                    plugin loaded from harp_gliss.scripter
+                                    .js, pulled from a Harp Gliss reference
+                                    concert. Used verbatim as the SOURCE
+                                    .cst whenever a cue asks for 'Harp
+                                    Gliss'; song patches alias into it.
+- harp_gliss_source_channel_plist — the channel dict for the harp gliss
+                                    template (same role as the sampler
+                                    source channel dict, above)
 """
 import plistlib
 import base64
@@ -35,6 +49,7 @@ BASE = os.environ.get(
     "/Users/roger/Music/Mainstage Concert Builder",
 )
 REF = f"{BASE}/Footloose K2.concert"
+HARP_GLISS_REF = f"{BASE}/Harp Gliss.concert"
 OUT = f"{BASE}/_generator/template_blobs.json"
 
 
@@ -109,6 +124,35 @@ def main():
     ch_plist_bytes = plistlib.dumps(harp_ch, fmt=plistlib.FMT_BINARY)
     blobs["sampler_source_channel_plist"] = base64.b64encode(ch_plist_bytes).decode("ascii")
     print(f"  sampler_source_channel_plist   {len(blobs['sampler_source_channel_plist']):>8} b64 chars")
+
+    # Harp Gliss template — the one-and-only channel strip in Roger's
+    # Harp Gliss reference concert. Harp EXS + Scripter plugin loaded from
+    # harp_gliss.scripter.js. We ship the .cst verbatim and the source
+    # channel dict from its containing patch's data.plist.
+    if os.path.isdir(HARP_GLISS_REF):
+        # Find the single patch folder and its channel dict
+        gliss_concert = plistlib.load(open(
+            f"{HARP_GLISS_REF}/Concert.patch/data.plist", "rb"
+        ))
+        # The one leaf/set folder under Concert.patch that isn't SOUNDS
+        gliss_patch_name = next(
+            n for n in gliss_concert.get("nodes", [])
+            if n != "SOUNDS.patch" and n.endswith(".patch")
+        )
+        gliss_leaf = plistlib.load(open(
+            f"{HARP_GLISS_REF}/Concert.patch/{gliss_patch_name}/data.plist", "rb"
+        ))
+        gliss_ch = gliss_leaf["channels"][0]
+        gliss_cst = f"{HARP_GLISS_REF}/Concert.patch/{gliss_patch_name}/{gliss_ch['Filename']}"
+        blobs["harp_gliss_template_cst"] = b64_file(gliss_cst)
+        print(f"  harp_gliss_template_cst        {len(blobs['harp_gliss_template_cst']):>8} b64 chars")
+        gliss_ch_bytes = plistlib.dumps(gliss_ch, fmt=plistlib.FMT_BINARY)
+        blobs["harp_gliss_source_channel_plist"] = base64.b64encode(gliss_ch_bytes).decode("ascii")
+        print(f"  harp_gliss_source_channel_plist{len(blobs['harp_gliss_source_channel_plist']):>8} b64 chars")
+    else:
+        print(f"  [Harp Gliss reference concert not at {HARP_GLISS_REF} — "
+              f"skipping harp_gliss blobs; the generator will fall through "
+              f"to placeholder for HARP GLISS cues]")
 
     os.makedirs(os.path.dirname(OUT), exist_ok=True)
     with open(OUT, "w") as f:
